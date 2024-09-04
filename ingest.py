@@ -93,10 +93,20 @@ def ler_csv(arquivo):
 def ler_pdf(arquivo):
     with open(arquivo, 'rb') as file:
         reader = PyPDF2.PdfReader(file)
-        texto = ""
+        texto_completo = ""
         for pagina in reader.pages:
-            texto += pagina.extract_text()
-    return [{"conteudo": texto}]
+            texto_completo += pagina.extract_text() + " "
+    
+    # Pré-processamento do texto
+    texto_preprocessado = preprocessar_texto(texto_completo)
+    
+    # Divide o texto em chunks
+    chunks = chunkar_texto(texto_preprocessado)
+    
+    # Cria um documento para cada chunk
+    documentos = [{"conteudo": chunk, "fonte": f"{arquivo}_chunk_{i}"} for i, chunk in enumerate(chunks)]
+    
+    return documentos
 
 def calcular_hash(conteudo):
     return hashlib.md5(json.dumps(conteudo, sort_keys=True).encode()).hexdigest()
@@ -139,7 +149,10 @@ for arquivo in os.listdir(diretorio_docs):
         inseridos, existentes = inserir_documentos(documentos, arquivo)
     elif arquivo.endswith('.pdf'):
         documentos = ler_pdf(caminho_arquivo)
-        inseridos, existentes = inserir_documentos(documentos, arquivo)
+        for i, doc in enumerate(documentos):
+            inseridos, existentes = inserir_documentos([doc], f"{arquivo}_chunk_{i}")
+            total_inseridos += inseridos
+            total_existentes += existentes
     else:
         print(f"Arquivo não suportado: {arquivo}")
         continue
