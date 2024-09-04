@@ -5,6 +5,10 @@ import PyPDF2
 import os
 import hashlib
 import json
+from sentence_transformers import SentenceTransformer
+import torch
+import re
+import numpy as np
 
 # Nome da coleção definido como uma constante global
 NOME_COLECAO = "my_collection"
@@ -19,7 +23,46 @@ except NameError:
 try:
     collection = client.get_collection(name=NOME_COLECAO)
 except ValueError:
-    collection = client.create_collection(name=NOME_COLECAO)
+    collection = client.create_collection(
+        name=NOME_COLECAO,
+        metadata={"hnsw:space": "cosine"}  # Configura para usar similaridade do cosseno
+    )
+
+# Inicializa o modelo de embeddings
+model = SentenceTransformer('distiluse-base-multilingual-cased-v2')
+
+MAX_TOKENS = 480  # máximo de 512
+OVERLAP = 160  #sobreposição
+
+def preprocessar_texto(texto):
+    # Converte para minúsculas
+    texto = texto.lower()
+    # Remove caracteres especiais, mantendo pontuação básica
+    texto = re.sub(r'[^a-záàâãéèêíïóôõöúçñ\s.,!?]', '', texto)
+    # Remove espaços extras
+    texto = re.sub(r'\s+', ' ', texto).strip()
+    return texto
+
+def chunkar_texto(texto, max_tokens=MAX_TOKENS, overlap=OVERLAP):
+    palavras = texto.split()
+    chunks = []
+    for i in range(0, len(palavras), max_tokens - overlap):
+        chunk = ' '.join(palavras[i:i + max_tokens])
+        chunks.append(chunk)
+    return chunks
+
+def gerar_embeddings(texto):
+    texto_preprocessado = preprocessar_texto(texto)
+    chunks = chunkar_texto(texto_preprocessado)
+    embeddings = model.encode(chunks)
+    
+    # Implementa uma estratégia de ponderação mais sofisticada
+    pesos = np.linspace(1.0, 1.5, len(chunks))  # Peso crescente para chunks posteriores
+    pesos[0] *= 1.2  # Aumenta o peso do primeiro chunk
+    pesos[-1] *= 1.2  # Aumenta o peso do último chunk
+    
+    embeddings_ponderados = embeddings * pesos[:, np.newaxis]
+    return np.mean(embeddings_ponderados, axis=0).tolist()
 
 def ler_csv(arquivo):
     # Lê o CSV sem usar a primeira linha como cabeçalho
@@ -64,14 +107,17 @@ def inserir_documentos(documentos, nome_arquivo):
     for doc in documentos:
         # Remove pares chave-valor com valores vazios
         doc = {k: v for k, v in doc.items() if v != ''}
+        texto_completo = ' '.join(str(v) for v in doc.values() if v is not None)
         hash_doc = calcular_hash(doc)
         id_doc = f"{nome_arquivo}_{hash_doc}"
         
         # Verifica se o documento já existe no banco de dados
         resultados = collection.get(ids=[id_doc])
         if not resultados['ids']:
+            embeddings = gerar_embeddings(texto_completo)
             collection.add(
-                documents=[json.dumps(doc)],  # Converte para JSON string
+                documents=[json.dumps(doc)],
+                embeddings=[embeddings],
                 metadatas=[{"source": nome_arquivo}],
                 ids=[id_doc]
             )
@@ -110,7 +156,3 @@ if total_inseridos == 0 and total_existentes > 0:
     print("Parece que todos os documentos já foram inseridos anteriormente.")
 elif total_inseridos == 0 and total_existentes == 0:
     print("Nenhum documento foi processado. Verifique se há arquivos válidos na pasta 'docs'.")
-
-#client.heartbeat() # retorna um heartbeat em nanossegundos. Útil para garantir que o cliente permaneça conectado.
-
-#client.reset() # Esvazia e redefine completamente o banco de dados. ⚠️ Isso é destrutivo e não reversível.
