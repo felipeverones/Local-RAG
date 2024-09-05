@@ -119,7 +119,9 @@ def pesquisar_e_responder(texto_pesquisa, llm):
     else:
         return "Desculpe, não encontrei informações relevantes para sua pergunta.", None
 
-def main():
+# IMPORTANTE: Descomente para rodar o chat no terminal!!!!!!!!!!!!!!!!!!
+
+""" def main():
     llm = configurar_llm()
 
     print("Assistente: Olá! Estou aqui para ajudar com suas buscas. O que você gostaria de saber? (Digite 'sair' para encerrar)")
@@ -143,4 +145,4 @@ def main():
     print("Programa encerrado.")
 
 if __name__ == "__main__":
-    main()
+    main() """
