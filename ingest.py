@@ -9,9 +9,17 @@ from sentence_transformers import SentenceTransformer
 import torch
 import re
 import numpy as np
+import chroma_setup
+from chroma_setup import NOME_COLECAO, client, collection
 
-# Nome da coleção definido como uma constante global
-NOME_COLECAO = "my_collection"
+
+""" # Nome da coleção definido como uma constante global
+NOME_COLECAO = "my_collection" """
+
+
+# Acesso ao cliente e à coleção
+client = chroma_setup.client
+collection = chroma_setup.collection
 
 # Verifica se o cliente já existe, caso contrário, cria um novo
 try:

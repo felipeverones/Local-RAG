@@ -2,11 +2,17 @@ import chromadb
 import os
 import shutil
 from chromadb.config import Settings
-from ingest import NOME_COLECAO
+import chroma_setup
+from chroma_setup import NOME_COLECAO
 
 def deletar_banco_dados():
+    
+    # Acesso ao cliente e à coleção
+    client = chroma_setup.client
+    #collection = chroma_setup.collection
+    
     # Cria um cliente persistente com configuração para permitir reset
-    client = chromadb.PersistentClient(path="db", settings=Settings(allow_reset=True))
+    #client = chromadb.PersistentClient(path="db", settings=Settings(allow_reset=True))
 
     try:
         # Tenta obter a coleção

@@ -47,3 +47,4 @@ inserir_documentos_interface()
 if st.button("Deletar Banco de Dados"):
     deletar_banco_dados()
     st.success("Banco de dados deletado com sucesso.")
+    

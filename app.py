@@ -1,4 +1,5 @@
 import streamlit as st
+import chroma_setup  # Importa chroma_setup antes de qualquer outro módulo
 from rag_main import configurar_llm, pesquisar_e_responder
 
 
@@ -12,6 +13,8 @@ def load_model():
 llm = load_model()
 
 st.title("Assistente RAG")
+
+
 
 # Inicializa o histórico de chat se não existir
 if "messages" not in st.session_state:

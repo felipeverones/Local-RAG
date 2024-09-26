@@ -7,19 +7,27 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
+import chroma_setup
+from chroma_setup import NOME_COLECAO
 
 # Suprimir avisos
 import warnings
 warnings.filterwarnings("ignore")
 
 # Configurações
-client = chromadb.PersistentClient(path="db", settings=Settings(allow_reset=True))
+
+# Acesso ao cliente e à coleção
+client = chroma_setup.client
+collection = chroma_setup.collection
+
+""" client = chromadb.PersistentClient(path="db", settings=Settings(allow_reset=True))
 NOME_COLECAO = "my_collection"
-collection = client.get_collection(name=NOME_COLECAO)
+collection = client.get_collection(name=NOME_COLECAO) """
+
 model = SentenceTransformer('distiluse-base-multilingual-cased-v2')
 MAX_TOKENS = 480
 OVERLAP = 160
-nome_modelo = "qwen2.5:latest"
+nome_modelo = "llama3.1:latest"
 
 def configurar_llm():
     print(f"Iniciando o modelo {nome_modelo}...")
@@ -117,7 +125,7 @@ def pesquisar_e_responder(texto_pesquisa, llm):
         resposta = gerar_resposta(texto_pesquisa, contexto, llm)
         return resposta, resultados
     else:
-        return "Desculpe, não encontrei informações relevantes para sua pergunta.", None
+        return "Desculpe, não encontrei informações relevantes para sua pergunta. Verifique seu banco de dados e tente novamente.", None
 
 # IMPORTANTE: Descomente para rodar o chat no terminal!!!!!!!!!!!!!!!!!!
 
