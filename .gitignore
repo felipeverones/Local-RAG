@@ -58,3 +58,4 @@ chroma.log
 # Outros
 *.bak
 *.tmp
+.aider*

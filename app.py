@@ -1,6 +1,7 @@
 import streamlit as st
 from rag_main import configurar_llm, pesquisar_e_responder
 
+
 st.set_page_config(page_title="Assistente RAG", page_icon="🤖", layout="wide")
 
 # Inicialização do modelo

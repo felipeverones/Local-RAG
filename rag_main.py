@@ -19,7 +19,7 @@ collection = client.get_collection(name=NOME_COLECAO)
 model = SentenceTransformer('distiluse-base-multilingual-cased-v2')
 MAX_TOKENS = 480
 OVERLAP = 160
-nome_modelo = "llama3.1:latest"
+nome_modelo = "qwen2.5:latest"
 
 def configurar_llm():
     print(f"Iniciando o modelo {nome_modelo}...")
