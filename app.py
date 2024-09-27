@@ -8,9 +8,22 @@ st.set_page_config(page_title="Assistente RAG", page_icon="🤖", layout="wide")
 # Inicialização do modelo
 @st.cache_resource
 def load_model():
-    return configurar_llm()
+    try:
+        llm = configurar_llm()
+        if llm is None:
+            return None, "Erro ao conectar ao Ollama. Verifique se o Ollama está rodando."
+        return llm, None
+    except Exception as e:
+        return None, str("Erro ao carregar o modelo: " + str(e))
+    
+        
+# Carrega o modelo e verifica se houve erro
+llm, error_message = load_model()
 
-llm = load_model()
+# Exibe mensagem de erro se houve
+if error_message:
+    st.error(error_message)
+    st.stop()
 
 st.title("Assistente RAG")
 

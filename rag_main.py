@@ -1,3 +1,4 @@
+import requests
 import chromadb
 from chromadb.config import Settings
 import json
@@ -28,12 +29,28 @@ model = SentenceTransformer('distiluse-base-multilingual-cased-v2')
 MAX_TOKENS = 480
 OVERLAP = 160
 nome_modelo = "llama3.1:latest"
+OLLAMA_API_URL="http://localhost:11434/api/generate"
+
+def verificar_conexao_ollama():
+    """Verifica se o Ollama está rodando e responde na URL da API."""
+    try:
+        resposta = requests.post(OLLAMA_API_URL, json={"model": nome_modelo, "prompt": "Olá"})
+        resposta.raise_for_status() #isso lança uma exceção se a resposta não for 200 (ok)
+        return True
+    except requests.exceptions.RequestException as e:
+        print(f"Erro ao verificar conexão com o Ollama: {e}")
+        return False
 
 def configurar_llm():
-    print(f"Iniciando o modelo {nome_modelo}...")
-    llm = Ollama(model=nome_modelo)
-    print(f"Modelo {nome_modelo} iniciado com sucesso!")
-    return llm
+    """Configura o LLM Ollama se a conexão for bem-sucedida."""
+    if verificar_conexao_ollama():
+        print(f"Iniciando o modelo {nome_modelo}...")
+        llm = Ollama(model=nome_modelo)
+        print(f"Modelo {nome_modelo} iniciado com sucesso!")
+        return llm
+    else:
+        print(f"Não foi possível conectar ao Ollama. Verifique se o Ollama está rodando e se a URL da API está correta.")
+        return None
 
 def preprocessar_texto(texto):
     texto = texto.lower()

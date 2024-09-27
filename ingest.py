@@ -21,7 +21,7 @@ NOME_COLECAO = "my_collection" """
 client = chroma_setup.client
 collection = chroma_setup.collection
 
-# Verifica se o cliente já existe, caso contrário, cria um novo
+""" # Verifica se o cliente já existe, caso contrário, cria um novo
 try:
     client
 except NameError:
@@ -34,7 +34,7 @@ except ValueError:
     collection = client.create_collection(
         name=NOME_COLECAO,
         metadata={"hnsw:space": "cosine"}  # Configura para usar similaridade do cosseno
-    )
+    ) """
 
 # Inicializa o modelo de embeddings
 model = SentenceTransformer('distiluse-base-multilingual-cased-v2')
