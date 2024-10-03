@@ -1,4 +1,3 @@
-import chromadb
 from chromadb.config import Settings
 import pandas as pd
 import PyPDF2
@@ -11,10 +10,8 @@ import re
 import numpy as np
 import chroma_setup
 from chroma_setup import NOME_COLECAO, client, collection
+import config
 
-
-""" # Nome da coleção definido como uma constante global
-NOME_COLECAO = "my_collection" """
 
 
 # Acesso ao cliente e à coleção
@@ -36,11 +33,10 @@ except ValueError:
         metadata={"hnsw:space": "cosine"}  # Configura para usar similaridade do cosseno
     ) """
 
-# Inicializa o modelo de embeddings
-model = SentenceTransformer('distiluse-base-multilingual-cased-v2')
-
-MAX_TOKENS = 480  # máximo de 512
-OVERLAP = 160  #sobreposição
+# Inicializa o modelo de embeddings e variáveis de ambiente 
+model = SentenceTransformer(config.MODELO_EMBEDDINGS)
+MAX_TOKENS = int(config.MAX_TOKENS)  # máximo de 512
+OVERLAP = int(config.OVERLAP)  #sobreposição
 
 def preprocessar_texto(texto):
     # Converte para minúsculas
@@ -145,10 +141,16 @@ def inserir_documentos(documentos, nome_arquivo):
     
     return documentos_inseridos, documentos_existentes
 
-# Lê e insere documentos CSV e PDF do diretório 'docs'
-diretorio_docs = 'docs'
+# Lê e insere documentos CSV e PDF do diretório
+diretorio_docs = config.DIRETORIO_DOCS
 total_inseridos = 0
 total_existentes = 0
+
+# Verifica se o diretório existe, e cria se não existir
+if not os.path.exists(diretorio_docs):
+    os.mkdir(diretorio_docs)
+    print(f"Diretório '{diretorio_docs}' criado.")
+
 
 for arquivo in os.listdir(diretorio_docs):
     caminho_arquivo = os.path.join(diretorio_docs, arquivo)

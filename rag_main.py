@@ -1,5 +1,5 @@
 import requests
-import chromadb
+import os 
 from chromadb.config import Settings
 import json
 from sentence_transformers import SentenceTransformer
@@ -10,26 +10,26 @@ from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
 import chroma_setup
 from chroma_setup import NOME_COLECAO
+import config
+
 
 # Suprimir avisos
 import warnings
 warnings.filterwarnings("ignore")
 
-# Configurações
 
 # Acesso ao cliente e à coleção
 client = chroma_setup.client
 collection = chroma_setup.collection
 
-""" client = chromadb.PersistentClient(path="db", settings=Settings(allow_reset=True))
-NOME_COLECAO = "my_collection"
-collection = client.get_collection(name=NOME_COLECAO) """
 
-model = SentenceTransformer('distiluse-base-multilingual-cased-v2')
-MAX_TOKENS = 480
-OVERLAP = 160
-nome_modelo = "llama3.1:latest"
-OLLAMA_API_URL="http://localhost:11434/api/generate"
+# Acesso às variáveis de configuração
+model = SentenceTransformer(config.MODELO_EMBEDDINGS)
+MAX_TOKENS = int(config.MAX_TOKENS)
+OVERLAP = int(config.OVERLAP)
+nome_modelo = config.MODELO_OLLAMA
+OLLAMA_API_URL = config.OLLAMA_API_URL
+
 
 def verificar_conexao_ollama():
     """Verifica se o Ollama está rodando e responde na URL da API."""

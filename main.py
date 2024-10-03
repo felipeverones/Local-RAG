@@ -1,26 +1,25 @@
-import chromadb
 from chromadb.config import Settings
 import json
+import os
 from sentence_transformers import SentenceTransformer
 import torch
 import re
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
+from chroma_setup import NOME_COLECAO, client, collection
+import config
 
-# Cria um cliente persistente
-client = chromadb.PersistentClient(path="db", settings=Settings(allow_reset=True))
 
-# Nome da coleção
-NOME_COLECAO = "my_collection"
 
-# Obtém a coleção
-collection = client.get_collection(name=NOME_COLECAO)
+# Cria um cliente persistente e obtém a coleção
+client = chroma_setup.client
+collection = chroma_setup.collection
 
 # Inicializa o modelo de embeddings
-model = SentenceTransformer('distiluse-base-multilingual-cased-v2')
+model = SentenceTransformer(config.MODELO_EMBEDDINGS)
+MAX_TOKENS = int(config.MAX_TOKENS)  # máximo de 512
+OVERLAP = int(config.OVERLAP)  #sobreposição
 
-MAX_TOKENS = 480  # máximo de 512
-OVERLAP = 160  #sobreposição
 
 def preprocessar_texto(texto):
     texto = texto.lower()
