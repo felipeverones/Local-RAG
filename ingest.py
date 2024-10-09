@@ -34,7 +34,7 @@ except ValueError:
     ) """
 
 # Inicializa o modelo de embeddings e variáveis de ambiente 
-model = SentenceTransformer(config.MODELO_EMBEDDINGS)
+model = SentenceTransformer(config.MODELO_EMBEDDINGS, device="cuda")
 MAX_TOKENS = int(config.MAX_TOKENS)  # máximo de 512
 OVERLAP = int(config.OVERLAP)  #sobreposição
 
@@ -56,21 +56,36 @@ def chunkar_texto(texto, max_tokens=MAX_TOKENS, overlap=OVERLAP):
     return chunks
 
 def gerar_embeddings(texto):
+    if not texto or len(texto.strip()) == 0:
+        print(f"Aviso: Texto vazio encontrado, pulando geração de embedding")
+        return None
+    
     texto_preprocessado = preprocessar_texto(texto)
     chunks = chunkar_texto(texto_preprocessado)
-    embeddings = model.encode(chunks)
     
-    # Implementa uma estratégia de ponderação mais sofisticada
-    pesos = np.linspace(1.0, 1.5, len(chunks))  # Peso crescente para chunks posteriores
-    pesos[0] *= 1.2  # Aumenta o peso do primeiro chunk
-    pesos[-1] *= 1.2  # Aumenta o peso do último chunk
+    if not chunks:
+        print(f"Aviso: Nenhum chunk gerado após preprocessamento")
+        return None
     
-    embeddings_ponderados = embeddings * pesos[:, np.newaxis]
-    return np.mean(embeddings_ponderados, axis=0).tolist()
+    try:
+        embeddings = model.encode(chunks)
+        
+        # Implementa uma estratégia de ponderação mais sofisticada
+        pesos = np.linspace(1.0, 1.5, len(chunks))  # Peso crescente para chunks posteriores
+        pesos[0] *= 1.2  # Aumenta o peso do primeiro chunk
+        pesos[-1] *= 1.2  # Aumenta o peso do último chunk
+        
+        embeddings_ponderados = embeddings * pesos[:, np.newaxis]
+        return np.mean(embeddings_ponderados, axis=0).tolist()
+    except Exception as e:
+        print(f"Erro ao gerar embeddings: {e}")
+        return None        
 
 def ler_csv(arquivo):
     # Lê o CSV sem usar a primeira linha como cabeçalho
-    df = pd.read_csv(arquivo, header=None, keep_default_na=False)
+    df = pd.read_csv(arquivo, 
+                     #header=None,
+                     keep_default_na=False)
     
     # Cria nomes de colunas genéricos
     df.columns = [f'Coluna_{i}' for i in range(len(df.columns))]
@@ -93,6 +108,8 @@ def ler_csv(arquivo):
             print(f"{key}: {value}")
     
     return records
+
+
 
 def ler_pdf(arquivo):
     with open(arquivo, 'rb') as file:
@@ -122,6 +139,11 @@ def inserir_documentos(documentos, nome_arquivo):
         # Remove pares chave-valor com valores vazios
         doc = {k: v for k, v in doc.items() if v != ''}
         texto_completo = ' '.join(str(v) for v in doc.values() if v is not None)
+        
+        if not texto_completo.strip():
+            print(f"Aviso: Texto vazio encontrado, pulando inserção do documento")
+            continue
+        
         hash_doc = calcular_hash(doc)
         id_doc = f"{nome_arquivo}_{hash_doc}"
         
@@ -129,13 +151,17 @@ def inserir_documentos(documentos, nome_arquivo):
         resultados = collection.get(ids=[id_doc])
         if not resultados['ids']:
             embeddings = gerar_embeddings(texto_completo)
-            collection.add(
-                documents=[json.dumps(doc)],
-                embeddings=[embeddings],
-                metadatas=[{"source": nome_arquivo}],
-                ids=[id_doc]
-            )
-            documentos_inseridos += 1
+            if embeddings is not None:
+                try:
+                    collection.add(
+                        documents=[json.dumps(doc)],
+                        embeddings=[embeddings],
+                        metadatas=[{"source": nome_arquivo}],
+                        ids=[id_doc]
+                    )
+                    documentos_inseridos += 1
+                except Exception as e:
+                    print(f"Erro ao inserir documento: {e}")
         else:
             documentos_existentes += 1
     

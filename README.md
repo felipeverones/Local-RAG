@@ -7,6 +7,7 @@ Este projeto implementa um sistema de Retrieval-Augmented Generation (RAG) usand
 - Python 3.11+
 - pip (gerenciador de pacotes do Python)
 - Ollama (para execução local dos modelos de linguagem)
+- CUDA Toolkit 12.4
 
 ## Instalação
 
