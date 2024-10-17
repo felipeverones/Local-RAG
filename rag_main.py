@@ -4,6 +4,7 @@ from chromadb.config import Settings
 import json
 from sentence_transformers import SentenceTransformer
 import re
+import torch
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from langchain_community.llms import Ollama
@@ -11,6 +12,7 @@ from langchain.prompts import PromptTemplate
 import chroma_setup
 from chroma_setup import NOME_COLECAO
 import config
+from carregar_modelo import carregar_modelo
 
 
 # Suprimir avisos
@@ -24,7 +26,8 @@ collection = chroma_setup.collection
 
 
 # Acesso às variáveis de configuração
-model = SentenceTransformer(config.MODELO_EMBEDDINGS)
+model, tokenizer = carregar_modelo(config.MODELO_EMBEDDINGS)
+
 MAX_TOKENS = int(config.MAX_TOKENS)
 OVERLAP = int(config.OVERLAP)
 nome_modelo = config.MODELO_OLLAMA
@@ -64,8 +67,8 @@ def calcular_pontuacao_personalizada(query, doc):
     query_preprocessada = preprocessar_texto(query)
     doc_preprocessado = preprocessar_texto(json.dumps(doc))
     
-    query_embedding = model.encode([query_preprocessada])[0]
-    doc_embedding = model.encode([doc_preprocessado])[0]
+    query_embedding = gerar_embeddings(query_preprocessada)
+    doc_embedding = gerar_embeddings(doc_preprocessado)
     similaridade_cosseno = cosine_similarity([query_embedding], [doc_embedding])[0][0]
     
     query_numeros = set(extrair_numeros(query))
@@ -94,9 +97,9 @@ def expandir_consulta(texto):
 
 def pesquisar_descricao(texto_pesquisa):
     texto_expandido = expandir_consulta(texto_pesquisa)
-    query_embeddings = model.encode([preprocessar_texto(texto_expandido)])[0].tolist()
+    query_embeddings = [gerar_embeddings(texto_expandido).cpu().tolist()]
     resultados = collection.query(
-        query_embeddings=[query_embeddings],
+        query_embeddings=query_embeddings,
         n_results=5
     )
     if resultados['distances'][0]:
@@ -111,7 +114,7 @@ def pesquisar_descricao(texto_pesquisa):
             
             doc["score"] = pontuacao
             documentos.append(doc)
-        return sorted(documentos, key=lambda x: x['score'], reverse=True)[:5]
+        return sorted(documentos, key=lambda x: x['score'], reverse=True)[:5]  # Ordena em ordem decrescente de score
     else:
         return None
 
@@ -143,6 +146,45 @@ def pesquisar_e_responder(texto_pesquisa, llm):
         return resposta, resultados
     else:
         return "Desculpe, não encontrei informações relevantes para sua pergunta. Verifique seu banco de dados e tente novamente.", None
+
+def gerar_embeddings(texto):
+    if not texto or len(texto.strip()) == 0:
+        print(f"Aviso: Texto vazio encontrado, pulando geração de embedding")
+        return None
+    
+    texto_preprocessado = preprocessar_texto(texto)
+    chunks = chunkar_texto(texto_preprocessado)
+    
+    if not chunks:
+        print(f"Aviso: Nenhum chunk gerado após preprocessamento")
+        return None
+    
+    try:
+        if tokenizer is None:
+            embeddings = model.encode(chunks)
+        else:
+            # Usar AutoModel para gerar embeddings
+            embeddings = []
+            for chunk in chunks:
+                tokens = tokenizer(chunk, return_tensors="pt").to(config.DEVICE)
+                with torch.no_grad():
+                    chunk_embeddings = model(**tokens).last_hidden_state
+                chunk_embeddings = torch.mean(chunk_embeddings, dim=1).cpu().numpy()  # Movendo para CPU antes de converter para NumPy
+                embeddings.append(chunk_embeddings)
+            embeddings = np.concatenate(embeddings, axis=0)
+
+        return torch.tensor(np.mean(embeddings, axis=0))
+    except Exception as e:
+        print(f"Erro ao gerar embeddings: {e}")
+        return None        
+
+def chunkar_texto(texto, max_tokens=MAX_TOKENS, overlap=OVERLAP):
+    palavras = texto.split()
+    chunks = []
+    for i in range(0, len(palavras), max_tokens - overlap):
+        chunk = ' '.join(palavras[i:i + max_tokens])
+        chunks.append(chunk)
+    return chunks
 
 # IMPORTANTE: Descomente para rodar o chat no terminal!!!!!!!!!!!!!!!!!!
 

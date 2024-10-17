@@ -8,6 +8,7 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from chroma_setup import NOME_COLECAO, client, collection
 import config
+from carregar_modelo import carregar_modelo
 
 
 
@@ -15,8 +16,9 @@ import config
 client = chroma_setup.client
 collection = chroma_setup.collection
 
-# Inicializa o modelo de embeddings
-model = SentenceTransformer(config.MODELO_EMBEDDINGS)
+#Inicializa o modelo de embeddings
+model, tokenizer = carregar_modelo(config.MODELO_EMBEDDINGS)
+    
 MAX_TOKENS = int(config.MAX_TOKENS)  # máximo de 512
 OVERLAP = int(config.OVERLAP)  #sobreposição
 
@@ -35,8 +37,8 @@ def calcular_pontuacao_personalizada(query, doc):
     doc_preprocessado = preprocessar_texto(json.dumps(doc))
     
     # Calcula a similaridade de cosseno
-    query_embedding = model.encode([query_preprocessada])[0]
-    doc_embedding = model.encode([doc_preprocessado])[0]
+    query_embedding = gerar_embeddings(query_preprocessada)
+    doc_embedding = gerar_embeddings(doc_preprocessado)
     similaridade_cosseno = cosine_similarity([query_embedding], [doc_embedding])[0][0]
     
     # Verifica correspondências exatas de números
@@ -67,16 +69,35 @@ def chunkar_texto(texto, max_tokens=MAX_TOKENS, overlap=OVERLAP):
     return chunks
 
 def gerar_embeddings(texto):
+    if not texto or len(texto.strip()) == 0:
+        print(f"Aviso: Texto vazio encontrado, pulando geração de embedding")
+        return None
+    
     texto_preprocessado = preprocessar_texto(texto)
     chunks = chunkar_texto(texto_preprocessado)
-    embeddings = model.encode(chunks)
     
-    pesos = np.linspace(1.0, 1.5, len(chunks))
-    pesos[0] *= 1.2
-    pesos[-1] *= 1.2
+    if not chunks:
+        print(f"Aviso: Nenhum chunk gerado após preprocessamento")
+        return None
     
-    embeddings_ponderados = embeddings * pesos[:, np.newaxis]
-    return np.mean(embeddings_ponderados, axis=0).tolist()
+    try:
+        if tokenizer is None:
+            embeddings = model.encode(chunks)
+        else:
+            # Usar AutoModel para gerar embeddings
+            embeddings = []
+            for chunk in chunks:
+                tokens = tokenizer(chunk, return_tensors="pt").to(config.DEVICE)
+                with torch.no_grad():
+                    chunk_embeddings = model(**tokens).last_hidden_state
+                chunk_embeddings = torch.mean(chunk_embeddings, dim=1).numpy()
+                embeddings.append(chunk_embeddings)
+            embeddings = np.concatenate(embeddings, axis=0)
+
+        return np.mean(embeddings, axis=0).tolist()
+    except Exception as e:
+        print(f"Erro ao gerar embeddings: {e}")
+        return None        
 
 def expandir_consulta(texto):
     # Simples expansão de consulta

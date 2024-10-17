@@ -4,13 +4,13 @@ import PyPDF2
 import os
 import hashlib
 import json
-from sentence_transformers import SentenceTransformer
 import torch
 import re
 import numpy as np
 import chroma_setup
 from chroma_setup import NOME_COLECAO, client, collection
 import config
+from carregar_modelo import carregar_modelo
 
 
 
@@ -18,23 +18,9 @@ import config
 client = chroma_setup.client
 collection = chroma_setup.collection
 
-""" # Verifica se o cliente já existe, caso contrário, cria um novo
-try:
-    client
-except NameError:
-    client = chromadb.PersistentClient(path="db", settings=Settings(allow_reset=True))
-
-# Verifica se a coleção já existe, caso contrário, cria uma nova
-try:
-    collection = client.get_collection(name=NOME_COLECAO)
-except ValueError:
-    collection = client.create_collection(
-        name=NOME_COLECAO,
-        metadata={"hnsw:space": "cosine"}  # Configura para usar similaridade do cosseno
-    ) """
-
 # Inicializa o modelo de embeddings e variáveis de ambiente 
-model = SentenceTransformer(config.MODELO_EMBEDDINGS, device="cuda")
+model, tokenizer = carregar_modelo(config.MODELO_EMBEDDINGS)
+    
 MAX_TOKENS = int(config.MAX_TOKENS)  # máximo de 512
 OVERLAP = int(config.OVERLAP)  #sobreposição
 
@@ -50,12 +36,60 @@ def preprocessar_texto(texto):
 def chunkar_texto(texto, max_tokens=MAX_TOKENS, overlap=OVERLAP):
     palavras = texto.split()
     chunks = []
-    for i in range(0, len(palavras), max_tokens - overlap):
-        chunk = ' '.join(palavras[i:i + max_tokens])
-        chunks.append(chunk)
+    i = 0
+    while i < len(palavras):
+        chunk = palavras[i:i + max_tokens]
+        chunks.append(' '.join(chunk))
+        i += max_tokens - overlap
     return chunks
 
-def gerar_embeddings(texto):
+def gerar_embeddings_para_documento(documento):
+    if isinstance(documento, pd.DataFrame):
+        return gerar_embeddings_para_dataframe(documento)
+    elif isinstance(documento, str):
+        return gerar_embeddings_para_texto(documento)
+    elif isinstance(documento, dict):
+        return gerar_embeddings_para_dict(documento)
+    else:
+        print(f"Tipo de documento não suportado: {type(documento)}")
+        return None
+
+def gerar_embeddings_para_dataframe(df):
+    embeddings = []
+    for coluna in df.columns:
+        texto_coluna = ' '.join(df[coluna].astype(str).fillna('').tolist())
+        if not texto_coluna or len(texto_coluna.strip()) == 0:
+            print(f"Aviso: Texto vazio encontrado na coluna {coluna}, pulando geração de embedding")
+            continue
+        
+        texto_preprocessado = preprocessar_texto(texto_coluna)
+        chunks = chunkar_texto(texto_preprocessado)
+        
+        if not chunks:
+            print(f"Aviso: Nenhum chunk gerado na coluna {coluna}, pulando geração de embedding")
+            continue
+        
+        try:
+            if tokenizer is None:
+                embeddings_coluna = model.encode(chunks)
+            else:
+                # Usar AutoModel para gerar embeddings
+                embeddings_coluna = []
+                for chunk in chunks:
+                    tokens = tokenizer(chunk, return_tensors="pt").to(config.DEVICE)
+                    with torch.no_grad():
+                        chunk_embeddings = model(**tokens).last_hidden_state
+                    chunk_embeddings = torch.mean(chunk_embeddings, dim=1).cpu().numpy()  # Movendo para CPU antes de converter para NumPy
+                    embeddings_coluna.append(chunk_embeddings)
+                embeddings_coluna = np.concatenate(embeddings_coluna, axis=0)
+
+            embeddings.append(np.mean(embeddings_coluna, axis=0).tolist())
+        except Exception as e:
+                print(f"Erro ao gerar embeddings: {e}")
+                return None
+    return embeddings
+
+def gerar_embeddings_para_texto(texto):
     if not texto or len(texto.strip()) == 0:
         print(f"Aviso: Texto vazio encontrado, pulando geração de embedding")
         return None
@@ -68,15 +102,53 @@ def gerar_embeddings(texto):
         return None
     
     try:
-        embeddings = model.encode(chunks)
-        
-        # Implementa uma estratégia de ponderação mais sofisticada
-        pesos = np.linspace(1.0, 1.5, len(chunks))  # Peso crescente para chunks posteriores
-        pesos[0] *= 1.2  # Aumenta o peso do primeiro chunk
-        pesos[-1] *= 1.2  # Aumenta o peso do último chunk
-        
-        embeddings_ponderados = embeddings * pesos[:, np.newaxis]
-        return np.mean(embeddings_ponderados, axis=0).tolist()
+        if tokenizer is None:
+            embeddings = model.encode(chunks)
+        else:
+            # Usar AutoModel para gerar embeddings
+            embeddings = []
+            for chunk in chunks:
+                tokens = tokenizer(chunk, return_tensors="pt").to(config.DEVICE)
+                with torch.no_grad():
+                    chunk_embeddings = model(**tokens).last_hidden_state
+                chunk_embeddings = torch.mean(chunk_embeddings, dim=1).cpu().numpy()  # Movendo para CPU antes de converter para NumPy
+                embeddings.append(chunk_embeddings)
+            embeddings = np.concatenate(embeddings, axis=0)
+
+        return np.mean(embeddings, axis=0).tolist()
+    except Exception as e:
+        print(f"Erro ao gerar embeddings: {e}")
+        return None        
+
+def gerar_embeddings_para_dict(documento):
+    texto_completo = ' '.join(str(v) for v in documento.values() if v is not None)
+    if not texto_completo.strip():
+        print(f"Aviso: Texto vazio encontrado, pulando geração de embedding")
+        return None
+    
+    texto_preprocessado = preprocessar_texto(texto_completo)
+    chunks = chunkar_texto(texto_preprocessado)
+    
+    if not chunks:
+        print(f"Aviso: Nenhum chunk gerado após preprocessamento")
+        return None
+    
+    try:
+        if tokenizer is None:
+            embeddings = model.encode(chunks)
+        else:
+            # Usar AutoModel para gerar embeddings
+            embeddings = []
+            for chunk in chunks:
+                tokens = tokenizer(chunk, return_tensors="pt").to(config.DEVICE)
+                ##print(f"Tokens: {tokens}")  # Adiciona um print para exibir os tokens
+                with torch.no_grad():
+                    chunk_embeddings = model(**tokens).last_hidden_state
+                chunk_embeddings = torch.mean(chunk_embeddings, dim=1).cpu().numpy()  # Movendo para CPU antes de converter para NumPy
+                embeddings.append(chunk_embeddings)
+            embeddings = np.concatenate(embeddings, axis=0)
+
+        return np.mean(embeddings, axis=0).tolist()
     except Exception as e:
         print(f"Erro ao gerar embeddings: {e}")
         return None        
@@ -150,7 +222,7 @@ def inserir_documentos(documentos, nome_arquivo):
         # Verifica se o documento já existe no banco de dados
         resultados = collection.get(ids=[id_doc])
         if not resultados['ids']:
-            embeddings = gerar_embeddings(texto_completo)
+            embeddings = gerar_embeddings_para_documento(doc)
             if embeddings is not None:
                 try:
                     collection.add(
@@ -161,7 +233,7 @@ def inserir_documentos(documentos, nome_arquivo):
                     )
                     documentos_inseridos += 1
                 except Exception as e:
-                    print(f"Erro ao inserir documento: {e}")
+                    print(f"Erro ao inserir documento: {e}, documento: {doc}")  # Adiciona informações sobre o erro e o documento
         else:
             documentos_existentes += 1
     
