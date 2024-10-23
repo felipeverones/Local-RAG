@@ -7,10 +7,9 @@ import re
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from chroma_setup import NOME_COLECAO, client, collection
+import chroma_setup
 import config
 from carregar_modelo import carregar_modelo
-
-
 
 # Cria um cliente persistente e obtém a coleção
 client = chroma_setup.client
@@ -18,10 +17,9 @@ collection = chroma_setup.collection
 
 #Inicializa o modelo de embeddings
 model, tokenizer = carregar_modelo(config.MODELO_EMBEDDINGS)
-    
+
 MAX_TOKENS = int(config.MAX_TOKENS)  # máximo de 512
 OVERLAP = int(config.OVERLAP)  #sobreposição
-
 
 def preprocessar_texto(texto):
     texto = texto.lower()
@@ -35,29 +33,29 @@ def extrair_numeros(texto):
 def calcular_pontuacao_personalizada(query, doc):
     query_preprocessada = preprocessar_texto(query)
     doc_preprocessado = preprocessar_texto(json.dumps(doc))
-    
+
     # Calcula a similaridade de cosseno
     query_embedding = gerar_embeddings(query_preprocessada)
     doc_embedding = gerar_embeddings(doc_preprocessado)
     similaridade_cosseno = cosine_similarity([query_embedding], [doc_embedding])[0][0]
-    
+
     # Verifica correspondências exatas de números
     query_numeros = set(extrair_numeros(query))
     doc_numeros = set(extrair_numeros(doc_preprocessado))
     correspondencias_numeros = len(query_numeros.intersection(doc_numeros))
-    
+
     # Verifica correspondências exatas de palavras-chave
     palavras_chave_query = set(query_preprocessada.split())
     palavras_chave_doc = set(doc_preprocessado.split())
     correspondencias_palavras = len(palavras_chave_query.intersection(palavras_chave_doc))
-    
+
     # Calcula a pontuação final
     pontuacao = (
         similaridade_cosseno * 0.5 +
         correspondencias_numeros * 0.3 +
         correspondencias_palavras * 0.2
     )
-    
+
     return pontuacao
 
 def chunkar_texto(texto, max_tokens=MAX_TOKENS, overlap=OVERLAP):
@@ -72,14 +70,14 @@ def gerar_embeddings(texto):
     if not texto or len(texto.strip()) == 0:
         print(f"Aviso: Texto vazio encontrado, pulando geração de embedding")
         return None
-    
+
     texto_preprocessado = preprocessar_texto(texto)
     chunks = chunkar_texto(texto_preprocessado)
-    
+
     if not chunks:
         print(f"Aviso: Nenhum chunk gerado após preprocessamento")
         return None
-    
+
     try:
         if tokenizer is None:
             embeddings = model.encode(chunks)
@@ -97,7 +95,7 @@ def gerar_embeddings(texto):
         return np.mean(embeddings, axis=0).tolist()
     except Exception as e:
         print(f"Erro ao gerar embeddings: {e}")
-        return None        
+        return None
 
 def expandir_consulta(texto):
     # Simples expansão de consulta
@@ -122,10 +120,10 @@ def pesquisar_descricao(texto_pesquisa):
                 doc = json.loads(doc_str)
             except json.JSONDecodeError:
                 doc = {"conteudo": doc_str}
-            
+
             # Calculamos a pontuação personalizada
             pontuacao = calcular_pontuacao_personalizada(texto_pesquisa, doc)
-            
+
             doc["score"] = pontuacao
             documentos.append(doc)
         return sorted(documentos, key=lambda x: x['score'], reverse=True)[:5]  # Retornamos os 5 melhores resultados
@@ -142,12 +140,12 @@ def exibir_resultado(resultado):
 # Interface de usuário simples
 while True:
     texto_pesquisa = input("Digite o texto para pesquisar (ou 'sair' para encerrar): ")
-    
+
     if texto_pesquisa.lower() == 'sair':
         break
-    
+
     resultados = pesquisar_descricao(texto_pesquisa)
-    
+
     if resultados:
         print("\nResultados encontrados:")
         for i, resultado in enumerate(resultados, 1):
@@ -155,7 +153,7 @@ while True:
             exibir_resultado(resultado)
     else:
         print("Nenhum resultado encontrado.")
-    
+
     print("\n" + "-"*50 + "\n")
 
 print("Programa encerrado.")
