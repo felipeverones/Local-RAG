@@ -12,15 +12,13 @@ from chroma_setup import NOME_COLECAO, client, collection
 import config
 from carregar_modelo import carregar_modelo
 
-
-
 # Acesso ao cliente e à coleção
 client = chroma_setup.client
 collection = chroma_setup.collection
 
-# Inicializa o modelo de embeddings e variáveis de ambiente 
+# Inicializa o modelo de embeddings e variáveis de ambiente
 model, tokenizer = carregar_modelo(config.MODELO_EMBEDDINGS)
-    
+
 MAX_TOKENS = int(config.MAX_TOKENS)  # máximo de 512
 OVERLAP = int(config.OVERLAP)  #sobreposição
 
@@ -61,14 +59,14 @@ def gerar_embeddings_para_dataframe(df):
         if not texto_coluna or len(texto_coluna.strip()) == 0:
             print(f"Aviso: Texto vazio encontrado na coluna {coluna}, pulando geração de embedding")
             continue
-        
+
         texto_preprocessado = preprocessar_texto(texto_coluna)
         chunks = chunkar_texto(texto_preprocessado)
-        
+
         if not chunks:
             print(f"Aviso: Nenhum chunk gerado na coluna {coluna}, pulando geração de embedding")
             continue
-        
+
         try:
             if tokenizer is None:
                 embeddings_coluna = model.encode(chunks)
@@ -93,14 +91,14 @@ def gerar_embeddings_para_texto(texto):
     if not texto or len(texto.strip()) == 0:
         print(f"Aviso: Texto vazio encontrado, pulando geração de embedding")
         return None
-    
+
     texto_preprocessado = preprocessar_texto(texto)
     chunks = chunkar_texto(texto_preprocessado)
-    
+
     if not chunks:
         print(f"Aviso: Nenhum chunk gerado após preprocessamento")
         return None
-    
+
     try:
         if tokenizer is None:
             embeddings = model.encode(chunks)
@@ -118,21 +116,21 @@ def gerar_embeddings_para_texto(texto):
         return np.mean(embeddings, axis=0).tolist()
     except Exception as e:
         print(f"Erro ao gerar embeddings: {e}")
-        return None        
+        return None
 
 def gerar_embeddings_para_dict(documento):
     texto_completo = ' '.join(str(v) for v in documento.values() if v is not None)
     if not texto_completo.strip():
         print(f"Aviso: Texto vazio encontrado, pulando geração de embedding")
         return None
-    
+
     texto_preprocessado = preprocessar_texto(texto_completo)
     chunks = chunkar_texto(texto_preprocessado)
-    
+
     if not chunks:
         print(f"Aviso: Nenhum chunk gerado após preprocessamento")
         return None
-    
+
     try:
         if tokenizer is None:
             embeddings = model.encode(chunks)
@@ -151,37 +149,39 @@ def gerar_embeddings_para_dict(documento):
         return np.mean(embeddings, axis=0).tolist()
     except Exception as e:
         print(f"Erro ao gerar embeddings: {e}")
-        return None        
+        return None
 
 def ler_csv(arquivo):
     # Lê o CSV sem usar a primeira linha como cabeçalho
-    df = pd.read_csv(arquivo, 
-                     #header=None,
-                     keep_default_na=False)
-    
+    df = pd.read_csv(arquivo,
+                     header=None,
+                     keep_default_na=False,
+                     on_bad_lines='skip')
+
+    # Preenche células vazias com uma string vazia para garantir que todas as linhas tenham o mesmo número de colunas
+    df = df.apply(lambda row: row.fillna(''), axis=1)
+
     # Cria nomes de colunas genéricos
     df.columns = [f'Coluna_{i}' for i in range(len(df.columns))]
-    
+
     # Remove colunas completamente vazias
     df = df.dropna(axis=1, how='all')
-    
+
     # Imprime informações sobre o DataFrame
     print(f"\nInformações sobre o arquivo {arquivo}:")
     print(f"Número de linhas: {len(df)}")
     print(f"Número de colunas: {len(df.columns)}")
-    
+
     # Converte para dicionário
     records = df.to_dict(orient='records')
-    
+
     # Imprime o primeiro registro para inspeção
     print("\nPrimeiro registro:")
     for key, value in records[0].items():
         if value:  # Imprime apenas valores não vazios
             print(f"{key}: {value}")
-    
+
     return records
-
-
 
 def ler_pdf(arquivo):
     with open(arquivo, 'rb') as file:
@@ -189,16 +189,16 @@ def ler_pdf(arquivo):
         texto_completo = ""
         for pagina in reader.pages:
             texto_completo += pagina.extract_text() + " "
-    
+
     # Pré-processamento do texto
     texto_preprocessado = preprocessar_texto(texto_completo)
-    
+
     # Divide o texto em chunks
     chunks = chunkar_texto(texto_preprocessado)
-    
+
     # Cria um documento para cada chunk
     documentos = [{"conteudo": chunk, "fonte": f"{arquivo}_chunk_{i}"} for i, chunk in enumerate(chunks)]
-    
+
     return documentos
 
 def calcular_hash(conteudo):
@@ -211,14 +211,14 @@ def inserir_documentos(documentos, nome_arquivo):
         # Remove pares chave-valor com valores vazios
         doc = {k: v for k, v in doc.items() if v != ''}
         texto_completo = ' '.join(str(v) for v in doc.values() if v is not None)
-        
+
         if not texto_completo.strip():
             print(f"Aviso: Texto vazio encontrado, pulando inserção do documento")
             continue
-        
+
         hash_doc = calcular_hash(doc)
         id_doc = f"{nome_arquivo}_{hash_doc}"
-        
+
         # Verifica se o documento já existe no banco de dados
         resultados = collection.get(ids=[id_doc])
         if not resultados['ids']:
@@ -236,7 +236,7 @@ def inserir_documentos(documentos, nome_arquivo):
                     print(f"Erro ao inserir documento: {e}, documento: {doc}")  # Adiciona informações sobre o erro e o documento
         else:
             documentos_existentes += 1
-    
+
     return documentos_inseridos, documentos_existentes
 
 # Lê e insere documentos CSV e PDF do diretório
@@ -248,7 +248,6 @@ total_existentes = 0
 if not os.path.exists(diretorio_docs):
     os.mkdir(diretorio_docs)
     print(f"Diretório '{diretorio_docs}' criado.")
-
 
 for arquivo in os.listdir(diretorio_docs):
     caminho_arquivo = os.path.join(diretorio_docs, arquivo)
@@ -264,7 +263,7 @@ for arquivo in os.listdir(diretorio_docs):
     else:
         print(f"Arquivo não suportado: {arquivo}")
         continue
-    
+
     total_inseridos += inseridos
     total_existentes += existentes
     print(f"Arquivo {arquivo}: {inseridos} documentos inseridos, {existentes} já existentes.")
