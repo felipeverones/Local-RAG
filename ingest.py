@@ -11,7 +11,7 @@ import chroma_setup
 from chroma_setup import NOME_COLECAO, client, collection
 import config
 from carregar_modelo import carregar_modelo
-import tabula
+from extrair_tabela import extrair_tabela_pdf
 
 # Acesso ao cliente e à coleção
 client = chroma_setup.client
@@ -21,7 +21,7 @@ collection = chroma_setup.collection
 model, tokenizer = carregar_modelo(config.MODELO_EMBEDDINGS)
 
 MAX_TOKENS = int(config.MAX_TOKENS)  # máximo de 512
-OVERLAP = int(config.OVERLAP)  #sobreposição
+OVERLAP = int(config.OVERLAP)  # sobreposição
 
 def preprocessar_texto(texto):
     # Converte para minúsculas
@@ -196,8 +196,16 @@ def ler_pdf(arquivo):
     else:
         raise TypeError("expected str, bytes or os.PathLike object, not UploadedFile")
 
-    # Extrair tabelas do PDF
-    tabelas = tabula.read_pdf(arquivo, pages='all', multiple_tables=True)
+    # Extrai tabelas do PDF
+    tabelas = extrair_tabela_pdf(arquivo)
+
+    # Converte tabelas para texto
+    texto_tabelas = ""
+    for tabela in tabelas:
+        texto_tabelas += tabela.to_string(index=False) + " "
+
+    # Combina texto do PDF com texto das tabelas
+    texto_completo += texto_tabelas
 
     # Pré-processamento do texto
     texto_preprocessado = preprocessar_texto(texto_completo)
@@ -212,7 +220,6 @@ def ler_pdf(arquivo):
     print(f"\nInformações sobre o arquivo {arquivo}:")
     print(f"Número de páginas: {len(reader.pages)}")
     print(f"Número de chunks gerados: {len(chunks)}")
-    print(f"Número de tabelas encontradas: {len(tabelas)}")
 
     return documentos
 
