@@ -11,6 +11,7 @@ import chroma_setup
 from chroma_setup import NOME_COLECAO, client, collection
 import config
 from carregar_modelo import carregar_modelo
+import tabula
 
 # Acesso ao cliente e à coleção
 client = chroma_setup.client
@@ -152,17 +153,14 @@ def gerar_embeddings_para_dict(documento):
         return None
 
 def ler_csv(arquivo):
-    # Lê o CSV sem usar a primeira linha como cabeçalho
+    # Lê o CSV usando a primeira linha como cabeçalho
     df = pd.read_csv(arquivo,
-                     header=None,
+                     header=0,
                      keep_default_na=False,
                      on_bad_lines='skip')
 
     # Preenche células vazias com uma string vazia para garantir que todas as linhas tenham o mesmo número de colunas
     df = df.apply(lambda row: row.fillna(''), axis=1)
-
-    # Cria nomes de colunas genéricos
-    df.columns = [f'Coluna_{i}' for i in range(len(df.columns))]
 
     # Remove colunas completamente vazias
     df = df.dropna(axis=1, how='all')
@@ -184,11 +182,22 @@ def ler_csv(arquivo):
     return records
 
 def ler_pdf(arquivo):
-    with open(arquivo, 'rb') as file:
-        reader = PyPDF2.PdfReader(file)
+    if isinstance(arquivo, str):
+        with open(arquivo, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            texto_completo = ""
+            for pagina in reader.pages:
+                texto_completo += pagina.extract_text() + " "
+    elif hasattr(arquivo, 'read'):
+        reader = PyPDF2.PdfReader(arquivo)
         texto_completo = ""
         for pagina in reader.pages:
             texto_completo += pagina.extract_text() + " "
+    else:
+        raise TypeError("expected str, bytes or os.PathLike object, not UploadedFile")
+
+    # Extrair tabelas do PDF
+    tabelas = tabula.read_pdf(arquivo, pages='all', multiple_tables=True)
 
     # Pré-processamento do texto
     texto_preprocessado = preprocessar_texto(texto_completo)
@@ -198,6 +207,12 @@ def ler_pdf(arquivo):
 
     # Cria um documento para cada chunk
     documentos = [{"conteudo": chunk, "fonte": f"{arquivo}_chunk_{i}"} for i, chunk in enumerate(chunks)]
+
+    # Imprime informações sobre o PDF
+    print(f"\nInformações sobre o arquivo {arquivo}:")
+    print(f"Número de páginas: {len(reader.pages)}")
+    print(f"Número de chunks gerados: {len(chunks)}")
+    print(f"Número de tabelas encontradas: {len(tabelas)}")
 
     return documentos
 
