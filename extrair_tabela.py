@@ -40,7 +40,7 @@ def extrair_tabela_pdf(caminho_arquivo):
     return tabelas
 
 # Caminho do arquivo PDF
-caminho_arquivo = 'docs/Licitações 2024.pdf'
+#caminho_arquivo = 'docs/Licitações 2024.pdf'
 
 # Extrair e exibir a tabela
-extrair_tabela_pdf(caminho_arquivo)
+#extrair_tabela_pdf(caminho_arquivo)

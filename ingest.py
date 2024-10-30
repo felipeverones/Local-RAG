@@ -261,40 +261,43 @@ def inserir_documentos(documentos, nome_arquivo):
 
     return documentos_inseridos, documentos_existentes
 
-# Lê e insere documentos CSV e PDF do diretório
-diretorio_docs = config.DIRETORIO_DOCS
-total_inseridos = 0
-total_existentes = 0
 
-# Verifica se o diretório existe, e cria se não existir
-if not os.path.exists(diretorio_docs):
-    os.mkdir(diretorio_docs)
-    print(f"Diretório '{diretorio_docs}' criado.")
 
-for arquivo in os.listdir(diretorio_docs):
-    caminho_arquivo = os.path.join(diretorio_docs, arquivo)
-    if arquivo.endswith('.csv'):
-        documentos = ler_csv(caminho_arquivo)
-        inseridos, existentes = inserir_documentos(documentos, arquivo)
-    elif arquivo.endswith('.pdf'):
-        documentos = ler_pdf(caminho_arquivo)
-        for i, doc in enumerate(documentos):
-            inseridos, existentes = inserir_documentos([doc], f"{arquivo}_chunk_{i}")
-            total_inseridos += inseridos
-            total_existentes += existentes
-    else:
-        print(f"Arquivo não suportado: {arquivo}")
-        continue
+if __name__ == "__main__":
+    # Lê e insere documentos CSV e PDF do diretório
+    diretorio_docs = config.DIRETORIO_DOCS
+    total_inseridos = 0
+    total_existentes = 0
+    
+    # Verifica se o diretório existe, e cria se não existir
+    if not os.path.exists(diretorio_docs):
+        os.mkdir(diretorio_docs)
+        print(f"Diretório '{diretorio_docs}' criado.")
 
-    total_inseridos += inseridos
-    total_existentes += existentes
-    print(f"Arquivo {arquivo}: {inseridos} documentos inseridos, {existentes} já existentes.")
+    for arquivo in os.listdir(diretorio_docs):
+        caminho_arquivo = os.path.join(diretorio_docs, arquivo)
+        if arquivo.endswith('.csv'):
+            documentos = ler_csv(caminho_arquivo)
+            inseridos, existentes = inserir_documentos(documentos, arquivo)
+        elif arquivo.endswith('.pdf'):
+            documentos = ler_pdf(caminho_arquivo)
+            for i, doc in enumerate(documentos):
+                inseridos, existentes = inserir_documentos([doc], f"{arquivo}_chunk_{i}")
+                total_inseridos += inseridos
+                total_existentes += existentes
+        else:
+            print(f"Arquivo não suportado: {arquivo}")
+            continue
 
-print(f"\nResumo do processamento:")
-print(f"Total de documentos inseridos: {total_inseridos}")
-print(f"Total de documentos já existentes: {total_existentes}")
+        total_inseridos += inseridos
+        total_existentes += existentes
+        print(f"Arquivo {arquivo}: {inseridos} documentos inseridos, {existentes} já existentes.")
 
-if total_inseridos == 0 and total_existentes > 0:
-    print("Parece que todos os documentos já foram inseridos anteriormente.")
-elif total_inseridos == 0 and total_existentes == 0:
-    print("Nenhum documento foi processado. Verifique se há arquivos válidos na pasta 'docs'.")
+    print(f"\nResumo do processamento:")
+    print(f"Total de documentos inseridos: {total_inseridos}")
+    print(f"Total de documentos já existentes: {total_existentes}")
+
+    if total_inseridos == 0 and total_existentes > 0:
+        print("Parece que todos os documentos já foram inseridos anteriormente.")
+    elif total_inseridos == 0 and total_existentes == 0:
+        print("Nenhum documento foi processado. Verifique se há arquivos válidos na pasta 'docs'.")
