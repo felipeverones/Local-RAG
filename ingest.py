@@ -152,7 +152,7 @@ def gerar_embeddings_para_dict(documento):
         print(f"Erro ao gerar embeddings: {e}")
         return None
 
-def ler_csv(arquivo):
+""" def ler_csv(arquivo):
     # Lê o CSV usando a primeira linha como cabeçalho
     df = pd.read_csv(arquivo,
                      header=0,
@@ -179,7 +179,40 @@ def ler_csv(arquivo):
         if value:  # Imprime apenas valores não vazios
             print(f"{key}: {value}")
 
-    return records
+    return records """
+    
+def ler_csv(arquivo):
+    try:
+        # Handle both file path and file object cases
+        if isinstance(arquivo, str):
+            df = pd.read_csv(arquivo, header=0, keep_default_na=False, on_bad_lines='skip')
+        else:
+            # For uploaded files through Streamlit
+            df = pd.read_csv(arquivo, header=0, keep_default_na=False, on_bad_lines='skip')
+        
+        # Fill NA values and drop empty columns
+        df = df.fillna('')
+        df = df.dropna(axis=1, how='all')
+        
+        # Convert DataFrame to list of documents
+        documentos = []
+        for _, row in df.iterrows():
+            # Create a document for each row
+            documento = {
+                "conteudo": " ".join(str(val) for val in row if val),  # Combine all non-empty values
+                "metadados": {col: str(val) for col, val in row.items() if val}  # Store original values as metadata
+            }
+            documentos.append(documento)
+        
+        print(f"\nProcessamento CSV:")
+        print(f"Número de linhas processadas: {len(documentos)}")
+        print("Exemplo de documento:", documentos[0] if documentos else "Nenhum documento gerado")
+        
+        return documentos
+        
+    except Exception as e:
+        print(f"Erro ao processar CSV: {e}")
+        raise
 
 def ler_pdf(arquivo):
     if isinstance(arquivo, str):
@@ -227,40 +260,83 @@ def calcular_hash(conteudo):
     return hashlib.md5(json.dumps(conteudo, sort_keys=True).encode()).hexdigest()
 
 def inserir_documentos(documentos, nome_arquivo):
+    """
+    Insere documentos no ChromaDB com melhor tratamento de erros e logging
+    """
+    from datetime import datetime
+    import uuid
+    
     documentos_inseridos = 0
     documentos_existentes = 0
-    for doc in documentos:
-        # Remove pares chave-valor com valores vazios
-        doc = {k: v for k, v in doc.items() if v != ''}
-        texto_completo = ' '.join(str(v) for v in doc.values() if v is not None)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    session_id = str(uuid.uuid4())[:8]
+    
+    for idx, doc in enumerate(documentos):
+        try:
+            # Garantir que temos conteúdo para processar
+            if isinstance(doc, dict) and "conteudo" in doc:
+                texto_completo = doc["conteudo"]
+            else:
+                texto_completo = str(doc)  # Fallback para caso o documento não seja um dicionário
 
-        if not texto_completo.strip():
-            print(f"Aviso: Texto vazio encontrado, pulando inserção do documento")
-            continue
+            if not texto_completo.strip():
+                print(f"Aviso: Documento {idx} vazio, pulando...")
+                continue
 
-        hash_doc = calcular_hash(doc)
-        id_doc = f"{nome_arquivo}_{hash_doc}"
-
-        # Verifica se o documento já existe no banco de dados
-        resultados = collection.get(ids=[id_doc])
-        if not resultados['ids']:
+            id_doc = f"{nome_arquivo}_{timestamp}_{session_id}_{idx}"
+            
+            # Gerar embeddings
             embeddings = gerar_embeddings_para_documento(doc)
+            
             if embeddings is not None:
-                try:
-                    collection.add(
-                        documents=[json.dumps(doc)],
-                        embeddings=[embeddings],
-                        metadatas=[{"source": nome_arquivo}],
-                        ids=[id_doc]
-                    )
-                    documentos_inseridos += 1
-                except Exception as e:
-                    print(f"Erro ao inserir documento: {e}, documento: {doc}")  # Adiciona informações sobre o erro e o documento
-        else:
+                # Preparar metadados
+                metadata = {
+                    "source": nome_arquivo,
+                    "timestamp": timestamp,
+                    "chunk_index": idx
+                }
+                
+                # Se o documento tem metadados próprios, incluí-los
+                if isinstance(doc, dict) and "metadados" in doc:
+                    metadata.update(doc["metadados"])
+                
+                # Inserir no ChromaDB
+                collection.add(
+                    documents=[json.dumps(doc)],
+                    embeddings=[embeddings],
+                    metadatas=[metadata],
+                    ids=[id_doc]
+                )
+                
+                documentos_inseridos += 1
+                print(f"Documento {id_doc} inserido com sucesso")
+            else:
+                print(f"Aviso: Não foi possível gerar embeddings para o documento {id_doc}")
+                documentos_existentes += 1
+                
+        except Exception as e:
+            print(f"Erro ao processar documento {idx}: {str(e)}")
             documentos_existentes += 1
-
+            continue
+            
     return documentos_inseridos, documentos_existentes
 
+
+def limpar_documentos_fonte(nome_arquivo):
+    """
+    Remove todos os documentos anteriores com a mesma fonte antes de inserir novos.
+    
+    Args:
+        nome_arquivo (str): Nome do arquivo/fonte a ser limpo
+    """
+    try:
+        collection.delete(
+            where={"source": nome_arquivo}
+        )
+        print(f"Documentos anteriores de {nome_arquivo} removidos com sucesso.")
+    except Exception as e:
+        print(f"Erro ao tentar limpar documentos anteriores: {e}")
 
 
 if __name__ == "__main__":
