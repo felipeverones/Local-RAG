@@ -1,4 +1,4 @@
-cd .    # Este comando mantém você na pasta do projeto
+cd .
 call venv\Scripts\activate
 start ollama serve
 streamlit run app.py

@@ -156,6 +156,7 @@ if st.button("Limpar Conversa", disabled=st.session_state.is_processing):
     st.session_state.upload_state = None
     st.rerun()
 
+
 # Container para o upload e processamento
 with st.container():
     # Upload do documento
@@ -225,6 +226,14 @@ with st.container():
         finally:
             set_processing_state(False)
 
-# Mostra o documento atual
+# Mostra o documento atual e adiciona a capacidade de removê-lo
 if st.session_state.documento_atual:
-    st.info(f"Documento atual: {st.session_state.documento_atual}")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.info(f"Documento atual: {st.session_state.documento_atual}")
+    with col2:
+        if st.button("Remover Documento", disabled=st.session_state.is_processing):
+            st.session_state.documento_atual = None
+            st.session_state.upload_state = None
+            st.rerun()
+
