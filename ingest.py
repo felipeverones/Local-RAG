@@ -193,6 +193,7 @@ def ler_csv(arquivo):
         # Fill NA values and drop empty columns
         df = df.fillna('')
         df = df.dropna(axis=1, how='all')
+        print(df.head())  # Print the first few rows of the DataFrame for debugging
         
         # Convert DataFrame to list of documents
         documentos = []
@@ -339,7 +340,10 @@ def limpar_documentos_fonte(nome_arquivo):
         print(f"Erro ao tentar limpar documentos anteriores: {e}")
 
 
-if __name__ == "__main__":
+#####################################################################################
+# Funções de processamento de texto e embeddings
+
+def ingest_documents():
     # Lê e insere documentos CSV e PDF do diretório
     diretorio_docs = config.DIRETORIO_DOCS
     total_inseridos = 0
@@ -377,3 +381,9 @@ if __name__ == "__main__":
         print("Parece que todos os documentos já foram inseridos anteriormente.")
     elif total_inseridos == 0 and total_existentes == 0:
         print("Nenhum documento foi processado. Verifique se há arquivos válidos na pasta 'docs'.")
+    return 0
+
+if __name__ == "__main__":
+    ingest_documents()
+    
+

@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-from ingest import inserir_documentos, ler_csv, ler_pdf  # Certifique-se de que essas funções estão disponíveis
+from ingest import inserir_documentos, ler_csv, ler_pdf, ingest_documents  # Certifique-se de que essas funções estão disponíveis
 from delete_db import deletar_banco_dados
 
 # Configuração da página deve ser a primeira chamada do Streamlit
@@ -45,6 +45,11 @@ inserir_documentos_interface()
 
 # Botão para deletar banco de dados
 if st.button("Deletar Banco de Dados"):
-    deletar_banco_dados()
+    with st.spinner("Deletando banco de dados..."):
+        deletar_banco_dados()
     st.success("Banco de dados deletado com sucesso.")
-    
+
+if st.button("Atualizar Banco de dados"):
+    with st.spinner("Atualizando banco de dados..."):
+        ingest_documents()
+    st.success("Banco de dados atualizado com sucesso!")
