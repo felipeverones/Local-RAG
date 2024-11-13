@@ -23,6 +23,7 @@ model, tokenizer = carregar_modelo(config.MODELO_EMBEDDINGS)
 MAX_TOKENS = int(config.MAX_TOKENS)  # máximo de 512
 OVERLAP = int(config.OVERLAP)  # sobreposição
 
+
 def preprocessar_texto(texto):
     # Converte para minúsculas
     texto = texto.lower()
@@ -266,6 +267,10 @@ def inserir_documentos(documentos, nome_arquivo):
     """
     from datetime import datetime
     import uuid
+    
+    # Acesso ao cliente e à coleção
+    client = chroma_setup.client
+    collection = chroma_setup.collection
     
     documentos_inseridos = 0
     documentos_existentes = 0

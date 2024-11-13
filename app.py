@@ -121,11 +121,12 @@ if prompt and not st.session_state.is_processing:
         try:
             # Pesquisa considerando o documento atual
             documento_filtro = st.session_state.documento_atual
-            resposta, resultados = pesquisar_e_responder(
-                prompt, 
-                llm,
-                documento_filtro
-            )
+            with st.spinner("Pesquisando..."):
+                resposta, resultados = pesquisar_e_responder(
+                    prompt, 
+                    llm,
+                    documento_filtro
+                )
 
             for chunk in resposta.split():
                 full_response += chunk + " "
