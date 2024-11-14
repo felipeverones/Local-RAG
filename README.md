@@ -44,6 +44,8 @@ Este projeto implementa um sistema de Retrieval-Augmented Generation (RAG) usand
 4. Instale as dependências:
    ```
    pip install -r requirements.txt
+
+   pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
    ```
 
 5. Baixe o modelo (Por padrão, o modelo utilizado é o Llama 3.1):
